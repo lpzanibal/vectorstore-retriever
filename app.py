@@ -1,18 +1,20 @@
+import os
+from dotenv import load_dotenv
 import streamlit as st
 
+load_dotenv()
 
-def get_results(input_text):
-    st.info("Lorem ipsum dolor sit amet, consectetur adipiscing elit.")
+if "openai_api_key" not in st.session_state:
+    st.session_state["openai_api_key"] = (
+        os.getenv("OPENAI_API_KEY") if os.getenv("OPENAI_API_KEY") != "" else ""
+    )
 
+pg = st.navigation([st.Page("home.py"), st.Page("retriever.py"), st.Page("pdf.py")])
 
-st.title("Vectorstore Retriever 🔎📚")
+with st.sidebar:
+    openai_api_key = st.text_input(
+        "OpenAI API Key", type="password", value=st.session_state.openai_api_key
+    )
+    st.session_state.openai_api_key = openai_api_key
 
-with st.form("search_form"):
-    col1, col2 = st.columns([3, 1], vertical_alignment="bottom")
-
-    text = col1.text_input("Ingrese el término de búsqueda:")
-    submitted = col2.form_submit_button("Buscar", use_container_width=True)
-
-    st.text("Resultados:")
-    if submitted:
-        get_results(text)
+pg.run()
