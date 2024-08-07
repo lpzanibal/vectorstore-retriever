@@ -6,9 +6,19 @@ from langchain_openai import OpenAIEmbeddings
 
 vectorstore = None
 
+st.title("Búsqueda en PDF 🔎📄")
 
-def digest_document(file, embeddings):
-    global vectorstore
+st.subheader("Cargar documento")
+col1, col2, col3 = st.columns(3)
+chunk_size = col1.number_input("Chunk size", value=1000)
+chunk_overlap = col2.number_input("Chunk overlap", value=200)
+embeddings = col3.selectbox(
+    "Embeddings",
+    ("openai", "huggingface"),
+)
+uploaded_file = st.file_uploader("Elegí un archivo .pdf", type="pdf")
+
+if st.button("Cargar", use_container_width=True):
     file_path = f"./temp/{uploaded_file.name}"
 
     with open(file_path, "wb") as file:
@@ -25,48 +35,31 @@ def digest_document(file, embeddings):
 
     vectorstore = FAISS.from_documents(docs, embedding_model)
 
-
-# def search(query):
-#     global vectorstore
-#     retriever = vectorstore.as_retriever()
-#     return retriever.invoke(query)
-
-
-st.title("Búsqueda en PDF 🔎📄")
-
-st.subheader("Cargar documento")
-with st.form("digest_form"):
-    col1, col2, col3 = st.columns(3)
-    chunk_size = col1.number_input("Chunk size", value=1000)
-    chunk_overlap = col2.number_input("Chunk overlap", value=200)
-    embeddings = col3.selectbox(
-        "Embeddings",
-        ("openai", "huggingface"),
-    )
-
-    uploaded_file = st.file_uploader("Elegí un archivo .pdf", type="pdf")
-    submitted = st.form_submit_button("Cargar", use_container_width=True)
-
-    if submitted:
-        digest_document(uploaded_file, embeddings)
-
-    if vectorstore is not None:
-        with st.expander(
-            f"Documento almacenado en {vectorstore.index.ntotal} registros"
-        ):
-            with st.echo():
-                st.write(vectorstore.docstore._dict)
+if vectorstore is not None:
+    with st.expander(f"Documento almacenado en {vectorstore.index.ntotal} registros"):
+        with st.echo():
+            st.write(vectorstore.docstore._dict)
 
 st.subheader("Buscar")
-with st.form("search_form"):
-    col1, col2 = st.columns(2, vertical_alignment="bottom")
-    query = col1.text_input(
-        "Ingrese el término de búsqueda:",
-        disabled=not submitted,
+col1, col2, col3 = st.columns(3, vertical_alignment="bottom")
+search_type = col1.selectbox(
+    "Tipo de búsqueda",
+    ("similarity", "similarity_score_threshold", "mmr"),
+)
+# search_kwargs={"score_threshold": 0.5}
+top_k = col2.number_input("Top k", value=4)
+score_threshold = col3.number_input(
+    "Score threshold", value=0.5, disabled=search_type != "similarity_score_threshold"
+)
+query = st.text_input(
+    "Ingrese el término de búsqueda:",
+    disabled=vectorstore is None,
+)
+if st.button("Buscar", use_container_width=True):
+    search_kwargs = {"score_threshold": score_threshold, "k": top_k}
+    retriever = vectorstore.as_retriever(
+        search_type=search_type, search_kwargs=search_kwargs
     )
-    submitted = col2.form_submit_button("Buscar", disabled=vectorstore is None)
-
-    # if submitted:
-    #     results = search(query)
-    #     with st.echo():
-    #         st.write(results)
+    results = retriever.invoke(query)
+    with st.echo():
+        st.write(results)
